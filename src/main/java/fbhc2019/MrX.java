@@ -11,95 +11,98 @@ import java.util.Stack;
  */
 public class MrX {
     public static void main(String[] args) throws Exception {
-        File file = new File("src/main/resources/2019/mr_x/mr_x_sample_input.txt");
+        // File file = new File("src/main/resources/2019/mr_x/mr_x_sample_input.txt");
+        File file = new File("src/main/resources/2019/mr_x/mr_x.txt");
         try (BufferedReader br = new BufferedReader(new FileReader(file))) {
             Scanner scanner = new Scanner(br);
             int testCases = scanner.nextInt();
             for (int t = 1; t <= testCases; t++) {
                 String str = scanner.next();
-                int rewrites = rewrite(str);
-                System.out.println(String.format("Case #%d: %d", t, rewrites));
+                IntRef ref = new IntRef();
+                generate(str.toCharArray(), 0, 0, ref);
+                System.out.println(String.format("Case #%d: %d", t, ref.value));
             }
         }
     }
 
-    private static int rewrite(String str) {
-        // ? --> can be anything
-        // 0 & ? = 0
-        // 1 | ? = 1
-        // x & X = 0
-        // x | X = 1
-        // x ^ X = 1
-        if (str.length() == 1) {
-            if (isNumber(str.charAt(0))) {
-                return 0;
+    private static class IntRef {
+        private int value = Integer.MAX_VALUE;
+    }
+
+    private static void generate(char[] expr, int index, int count, IntRef min) {
+        if (index == expr.length) {
+            String newExpr = new String(expr);
+            if (evaluate(newExpr, 0) == evaluate(newExpr, 1)) {
+                min.value = Math.min(min.value, count);
             }
-            return 1;
+            return;
         }
+        if (expr[index] == '&' || expr[index] == '|' || expr[index] == '^') {
+            char original = expr[index];
+            for (char op : new char[]{'&', '|', '^'}) {
+                expr[index] = op;
+                generate(expr, index + 1, expr[index] == original ? count : count + 1, min);
+            }
+            expr[index] = original;
+        } else if (expr[index] == '0' || expr[index] == '1' || expr[index] == 'x' || expr[index] == 'X') {
+            char original = expr[index];
+            for (char op : new char[]{'0', '1', 'x', 'X'}) {
+                expr[index] = op;
+                generate(expr, index + 1, expr[index] == original ? count : count + 1, min);
+            }
+            expr[index] = original;
+        } else {
+            generate(expr, index + 1, count, min);
+        }
+    }
+
+    private static char evaluate(String str, int x) {
         Stack<Character> operators = new Stack<>();
         Stack<Character> operands = new Stack<>();
-        int answer = 0;
         for (char c : str.toCharArray()) {
             if (c == ')') {
                 char a = operands.pop();
                 char b = operands.pop();
                 char op = operators.pop();
-                CharCount cc = evaluate(a, b, op);
-                operands.push(cc.ch);
-                answer += cc.count;
+                int n1;
+                if (a == '0' || a == '1') {
+                    n1 = a - '0';
+                } else if (a == 'x') {
+                    n1 = x;
+                } else { // a == 'X'
+                    n1 = x == 0 ? 1 : 0;
+                }
+                int n2;
+                if (b == '0' || b == '1') {
+                    n2 = b - '0';
+                } else if (b == 'x') {
+                    n2 = x;
+                } else { // b == 'X'
+                    n2 = x == 0 ? 1 : 0;
+                }
+                operands.push((char) (evaluate(n1, n2, op) + '0'));
             } else if (c == '&' || c == '|' || c == '^') {
                 operators.push(c);
             } else if (c == 'x' || c == 'X' || c == '0' || c == '1') {
                 operands.push(c);
             }
         }
-        return answer;
-    }
-
-    private static class CharCount {
-        private final char ch;
-        private final int count;
-
-        public CharCount(char ch, int count) {
-            this.ch = ch;
-            this.count = count;
+        char c = operands.pop();
+        if (c == 'x') {
+            return (char) (x + '0');
         }
+        if (c == 'X') {
+            return (char) ((x == 0 ? 1 : 0) + '0');
+        }
+        return c;
     }
 
-    private static CharCount evaluate(char a, char b, char op) {
+    private static int evaluate(int a, int b, int op) {
         if (op == '&') {
-            if (a == '0' || b == '0' || (a == 'x' && b == 'X') || (a == 'X' && b == 'x')) {
-                return new CharCount('0', 0);
-            }
-            if (isNumber(a) && isNumber(b)) {
-                int i = a - '0';
-                int j = b - '0';
-                return new CharCount((char) ((i & j) + '0'), 0);
-            }
+            return a & b;
         } else if (op == '|') {
-            if (a == '1' || b == '1' || (a == 'x' && b == 'X') || (a == 'X' && b == 'x')) {
-                return new CharCount('1', 0);
-            }
-            if (isNumber(a) && isNumber(b)) {
-                int i = a - '0';
-                int j = b - '0';
-                return new CharCount((char) ((i | j) + '0'), 0);
-            }
-        } else { // (op == '^')
-            if ((a == 'x' && b == 'X') || (a == 'X' && b == 'x')) {
-                return new CharCount('1', 0);
-            }
-            if (isNumber(a) && isNumber(b)) {
-                int i = a - '0';
-                int j = b - '0';
-                return new CharCount((char) ((i ^ j) + '0'), 0);
-            }
+            return a | b;
         }
-        // Modify 1 character. TODO: this is wrong!
-        return new CharCount('0', 1);
-    }
-
-    private static boolean isNumber(char c) {
-        return c == '0' || c == '1';
+        return a ^ b;
     }
 }
